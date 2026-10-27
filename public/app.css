@@ -160,6 +160,8 @@ p{margin:0}
 .fld.check a{color:inherit;text-underline-offset:3px}
 .foot-links{display:flex;gap:16px;flex-wrap:wrap}
 .foot-links a{color:var(--muted)}
+.report-kpis{margin-bottom:8px}
+.report-tabs{margin:16px 0 10px}
 .row-between.push-row{flex-wrap:wrap;gap:12px}
 .btn.push-btn{flex:1 1 240px;white-space:normal}
 .notify{max-width:640px;width:100%}

@@ -5,7 +5,7 @@
 ## Стек и запуск
 - Node.js 20+, Express 4, SQLite (better-sqlite3), серверный HTML без фреймворков. Зависимости: express, better-sqlite3, bcryptjs, qrcode. Новые зависимости — только если без них никак.
 - `npm install` → `DB_PATH=data/demo.db npm run demo` → `DB_PATH=data/demo.db npm start` (порт 3000).
-- `npm test` — сценарные тесты: `test/smoke.mjs` (платформа, листы, оплата), `test/yookassa.mjs` (ЮKassa на поддельном API), `test/epl.mjs` (ЭПЛ и услуги подписантов), `test/astral.mjs` (оператор ЭПД «Калуга Астрал» на поддельном API), `test/push.mjs` (push-уведомления), `test/launch.mjs` (оферта, политика, `/health`, резервные копии). Перед каждым коммитом все должны проходить.
+- `npm test` — сценарные тесты: `test/smoke.mjs` (платформа, листы, оплата), `test/yookassa.mjs` (ЮKassa на поддельном API), `test/epl.mjs` (ЭПЛ и услуги подписантов), `test/astral.mjs` (оператор ЭПД «Калуга Астрал» на поддельном API), `test/push.mjs` (push-уведомления), `test/reports.mjs` (отчёты владельца), `test/launch.mjs` (оферта, политика, `/health`, резервные копии). Перед каждым коммитом все должны проходить.
 - Сервер: `docker compose up -d` (приложение + Caddy с HTTPS + ежедневные копии `scripts/backup.mjs`), см. README «На сервер».
 - Демо-входы: платформа `root` / `root-demo-pass`; парк `owner` / `owner-demo`, `disp` / `disp-demo`, `medic` / `medic-demo`; исполнители сервиса `smed` / `smed-demo`, `smech` / `smech-demo`; водители `+7 900 000-00-01…05`, пароль `1111`.
 
@@ -16,6 +16,7 @@
 - `src/billing.js` — баланс, тарифы, подписка (`paid_until`, продление только из баланса, без денег парк в режиме `suspended`).
 - `src/payments.js` — ЮKassa (карта, СБП), тестовый режим без ключей, счета с QR по ГОСТ, выписка 1С. Деньги на баланс — только через `credit()` (идемпотентно).
 - `src/epd.js` — ЭПЛ: титулы Т1–Т5, права на подпись, пакетное подписание, регистрация в ГИС ЭПД, интерфейс оператора ЭПД (`OPERATOR_METHODS`). Оператор выбирается `EPD_OPERATOR`: `sandbox` (по умолчанию) или `astral` (`src/epd/astral.js`; пути API не сверены с документацией — см. README). Подписание применяется только по ответу оператора и только с сертификатом самого подписанта.
+- `src/reports.js` — отчёт владельца по дням и водителям (листы по дате смены, деньги по дню списания во времени парка).
 - `src/push.js` — Web Push без зависимостей (VAPID, aes128gcm). События — через `notify()` внутри транзакции изменения (очередь `push_outbox`), плановые — `scheduled()` раз в минуту. Ключи `VAPID_*`, без них выключено.
 - `src/routes/*` — маршруты по ролям: `public` (сайт, вход, регистрация, QR-проверка `/c/:token`, `/offer`, `/privacy`), `driver` (`/d`), `park` (`/p`), `super` (`/s`), `service` (`/x`, исполнители сервиса), `pay` (вебхук ЮKassa, уведомления оператора ЭПД `/epd/notify`, тестовая оплата).
 - `src/views/*` — HTML-шаблоны (функции, возвращающие строки; всё пользовательское — через `esc()`).

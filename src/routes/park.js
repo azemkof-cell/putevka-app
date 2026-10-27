@@ -11,6 +11,8 @@ import * as BV from '../views/billing.js';
 import * as EV from '../views/epl.js';
 import { parkServices } from '../views/services.js';
 import { notifyPage } from '../views/notify.js';
+import { reportsPage, reportsCsv } from '../views/reports.js';
+import { parkReport, reportPeriod } from '../reports.js';
 import { staffEvents } from '../push.js';
 import { signRights, parseSignItems } from '../epd.js';
 import { PayError } from '../payments.js';
@@ -493,6 +495,18 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, push
     });
     const csv = '﻿' + [head, ...lines].map((r) => r.map(cell).join(';')).join('\r\n');
     res.set('Content-Disposition', `attachment; filename="putevye-listy_${from}_${to}.csv"`).type('text/csv; charset=utf-8').send(csv);
+  });
+
+  /* ================= Отчёты (владелец) ================= */
+  const reportOf = (req) => {
+    const by = req.query.by === 'driver' ? 'driver' : 'day';
+    return { by, r: parkReport(db, req.park, reportPeriod(req.query, req.tz, parseDate)) };
+  };
+  app.get('/p/reports', needPark('owner'), (req, res) => page(req, res, { title: 'Отчёты', active: 'reports', body: reportsPage(reportOf(req)) }));
+  app.get('/p/reports.csv', needPark('owner'), (req, res) => {
+    const x = reportOf(req);
+    res.set('Content-Disposition', `attachment; filename="otchet-${x.by === 'driver' ? 'voditeli' : 'dni'}_${x.r.from}_${x.r.to}.csv"`)
+      .type('text/csv; charset=utf-8').send(reportsCsv(x));
   });
 
   /* ================= Сотрудники ================= */

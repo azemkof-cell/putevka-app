@@ -17,6 +17,7 @@ export function parkNav(user, counts = {}) {
     ['cars', '/p/cars', 'Машины', counts.carIssues || '', ops],
     ['carriers', '/p/carriers', 'Перевозчики', '', ops],
     ['journal', '/p/journal', 'Журнал', '', all],
+    ['reports', '/p/reports', 'Отчёты', '', own],
     ['staff', '/p/staff', 'Сотрудники', '', own],
     ['billing', '/p/billing', 'Баланс', '', own],
     ['settings', '/p/settings', 'Настройки', '', own],
