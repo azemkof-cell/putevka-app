@@ -6,6 +6,7 @@ import { DEFAULT_PARK_SETTINGS } from '../db.js';
 import { sheetStatus } from '../service.js';
 import * as C from '../views/common.js';
 import * as P from '../views/public.js';
+import * as L from '../views/legal.js';
 
 export default function publicRoutes(app, { db, auth, billing, epd, platform, rev, limiter, ipLimiter, signupLimiter }) {
   const page = (res, opts, code = 200) => res.status(code).type('html').send(C.publicPage(opts));
@@ -96,7 +97,7 @@ export default function publicRoutes(app, { db, auth, billing, epd, platform, re
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return again('Проверьте адрес эл. почты.');
     if (!/^[a-zA-Z0-9._-]{3,60}$/.test(v.login)) return again('Логин — от 3 латинских букв, цифр или знаков . _ -');
     if (pass.length < 8) return again('Пароль не короче 8 знаков.');
-    if (b.agree !== '1') return again('Нужно согласие на обработку персональных данных.');
+    if (b.agree !== '1') return again('Примите условия договора-оферты и дайте согласие на обработку персональных данных.');
     if (db.prepare('SELECT 1 FROM users WHERE login = ?').get(v.login)) return again('Такой логин уже занят.');
     signupLimiter.fail(req.ip);
     const terms = billing.newParkTerms();
@@ -122,6 +123,11 @@ export default function publicRoutes(app, { db, auth, billing, epd, platform, re
     const park = db.prepare('SELECT * FROM parks WHERE id = ?').get(s.park_id);
     page(res, { title: `Лист № ${s.no}`, bare: true, body: P.checkBody({ s, st: sheetStatus(s, park.tz), park, titles: s.epl ? epd.titlesOf(s.id) : null }) });
   });
+
+  /* ---------- legal documents ---------- */
+  app.get('/privacy', (req, res) => page(res, { title: 'Политика обработки персональных данных', body: L.privacyBody({ s: platform.get() }) }));
+  app.get('/offer', (req, res) => page(res, { title: 'Договор-оферта', body: L.offerBody({ s: platform.get(), services: platform.get(),
+    tariffs: db.prepare('SELECT * FROM tariffs WHERE personal = 0 ORDER BY is_default DESC, per_sheet DESC').all() }) }));
 
   app.get('/offline', (req, res) => res.type('html').send(P.offlineHtml()));
 

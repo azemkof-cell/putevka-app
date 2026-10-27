@@ -44,7 +44,7 @@ export function publicPage({ title, body, flash, bare = false }) {
 <header class="pub-top"><a class="brand" href="/">${checker()}<b>${APP_NAME}</b></a>
 ${bare ? '' : `<nav class="pub-nav"><a href="/#price">Тарифы</a><a href="/login">Войти</a><a class="btn btn-main btn-sm" href="/signup">Подключить парк</a></nav>`}</header>
 <main class="pub-main">${flashBox(flash)}${body}</main>
-<footer class="pub-foot"><span>${checker('checker sm')} ${APP_NAME} — путевые листы такси</span><a href="/login">Вход для водителей и парков</a></footer>
+<footer class="pub-foot"><span>${checker('checker sm')} ${APP_NAME} — путевые листы такси</span><nav class="foot-links"><a href="/offer">Договор-оферта</a><a href="/privacy">Персональные данные</a><a href="/login">Вход для водителей и парков</a></nav></footer>
 <script src="/app.js?v=4" defer></script>
 </body></html>`;
 }

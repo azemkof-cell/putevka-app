@@ -583,15 +583,15 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, svc,
   app.get('/p/billing/invoice/:id', needPark('owner'), wrap(async (req, res) => {
     const p = payments.get(toInt(req.params.id));
     if (!p || p.park_id !== req.park.id || !p.invoice_no) return res.redirect('/p/billing');
-    res.type('html').send(await invoiceHtml(p, req.park, '/p/billing'));
+    res.type('html').send(await invoiceHtml(p, req.park, '/p/billing', baseUrl(req)));
   }));
 
   /** Shared with the platform cabinet. */
-  async function invoiceHtml(p, park, backUrl) {
+  async function invoiceHtml(p, park, backUrl, site) {
     const req = platform.get();
     const purpose = `Оплата по счёту № ${p.invoice_no} от ${BV.longDate(p.created_at, park.tz).replace(' г.', '')} за сервис «Путёвка», таксопарк № ${park.id}. ${req.reqVat && req.reqVat !== 'none' ? `В т.ч. ${BV.vatLine(p.amount, req.reqVat)[0].replace('В том числе ', '')} ${BV.vatLine(p.amount, req.reqVat)[1]}` : 'Без НДС'}`;
     const qr = req.reqAccount ? await qrSvg(gostPayload({ name: req.reqName, account: req.reqAccount, bank: req.reqBank, bic: req.reqBic, corr: req.reqCorr, inn: req.reqInn, kpp: req.reqKpp, sum: p.amount, purpose })) : '';
-    return BV.invoiceDoc({ p, park, req, qr, purpose, tz: park.tz, back: backUrl });
+    return BV.invoiceDoc({ p, park, req, qr, purpose, tz: park.tz, back: backUrl, offerUrl: `${site}/offer` });
   }
   app.locals.invoiceHtml = invoiceHtml;
 

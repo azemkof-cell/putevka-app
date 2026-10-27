@@ -6,7 +6,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY src ./src
 COPY public ./public
 COPY scripts ./scripts
-RUN mkdir -p /app/data && chown -R node:node /app/data
+RUN mkdir -p /app/data /app/backups && chown -R node:node /app/data /app/backups
 USER node
 VOLUME /app/data
 EXPOSE 3000

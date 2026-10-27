@@ -102,7 +102,7 @@ export function vatLine(amount, rate) {
   return [`В том числе НДС ${r}%`, fRub(Math.round((amount * r) / (100 + r)))];
 }
 
-export function invoiceDoc({ p, park, req, qr, purpose, tz, back }) {
+export function invoiceDoc({ p, park, req, qr, purpose, tz, back, offerUrl = '/offer' }) {
   const payer = JSON.parse(p.payer || '{}');
   const [vatLabel, vatSum] = vatLine(p.amount, req.reqVat);
   const ready = req.reqName && req.reqAccount && req.reqBic;
@@ -121,7 +121,7 @@ ${ready ? '' : '<p class="flash flash-bad no-print paper-w">Реквизиты �
   <div class="inv-parties">
     <div><span>Поставщик</span><b>${esc([req.reqName, req.reqInn && 'ИНН ' + req.reqInn, req.reqKpp && 'КПП ' + req.reqKpp, req.reqAddr].filter(Boolean).join(', '))}</b></div>
     <div><span>Покупатель</span><b>${esc([payer.name, payer.inn && 'ИНН ' + payer.inn, payer.kpp && 'КПП ' + payer.kpp, payer.addr].filter(Boolean).join(', '))}</b></div>
-    <div><span>Основание</span><b>Договор-оферта сервиса «Путёвка», таксопарк № ${park.id}</b></div>
+    <div><span>Основание</span><b>Договор-оферта сервиса «Путёвка» (<a href="${esc(offerUrl)}">${esc(offerUrl.replace(/^https?:\/\//, ''))}</a>), таксопарк № ${park.id}</b></div>
   </div>
   <table class="inv-t"><thead><tr><th>№</th><th>Товары (работы, услуги)</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Сумма</th></tr></thead>
     <tbody><tr><td>1</td><td>Пополнение лицевого счёта (аванс) за услуги сервиса «Путёвка», таксопарк № ${park.id}</td><td>1</td><td>усл.</td><td class="mono">${fRub(p.amount)}</td><td class="mono">${fRub(p.amount)}</td></tr></tbody></table>
@@ -137,7 +137,7 @@ ${ready ? '' : '<p class="flash flash-bad no-print paper-w">Реквизиты �
       <p class="hint">Укажите номер счёта в назначении — тогда платёж зачислится автоматически. ${ready ? 'QR-код можно отсканировать в приложении банка: реквизиты и сумма подставятся сами.' : ''}</p></div>
   </div>
   <div class="inv-sign"><div><span>Руководитель</span><i></i></div><div><span>Бухгалтер</span><i></i></div></div>
-  <p class="hint">Оплата этого счёта означает согласие с условиями договора-оферты. Счёт действителен 10 банковских дней.</p>
+  <p class="hint">Оплата этого счёта означает согласие с условиями <a href="${esc(offerUrl)}">договора-оферты</a>. Счёт действителен 10 банковских дней.</p>
 </article>
 <script src="/app.js?v=4" defer></script></body></html>`;
 }

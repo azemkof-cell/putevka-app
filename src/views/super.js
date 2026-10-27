@@ -134,11 +134,14 @@ export function platformPage({ s }) {
       <label class="fld full">Получатель<input name="reqName" id="pl-rname" value="${esc(s.reqName || '')}" placeholder="ООО «Путёвка»"></label>
       <label class="fld">ИНН<input name="reqInn" id="pl-rinn" value="${esc(s.reqInn || '')}" inputmode="numeric"></label>
       <label class="fld">КПП<input name="reqKpp" id="pl-rkpp" value="${esc(s.reqKpp || '')}" inputmode="numeric"></label>
+      <label class="fld">ОГРН / ОГРНИП<input name="reqOgrn" id="pl-rogrn" value="${esc(s.reqOgrn || '')}" inputmode="numeric" maxlength="15"></label>
       <label class="fld">Расчётный счёт<input name="reqAccount" id="pl-racc" value="${esc(s.reqAccount || '')}" inputmode="numeric" maxlength="20"></label>
       <label class="fld">Банк<input name="reqBank" id="pl-rbank" value="${esc(s.reqBank || '')}"></label>
       <label class="fld">БИК<input name="reqBic" id="pl-rbic" value="${esc(s.reqBic || '')}" inputmode="numeric" maxlength="9"></label>
       <label class="fld">Корр. счёт<input name="reqCorr" id="pl-rcorr" value="${esc(s.reqCorr || '')}" inputmode="numeric" maxlength="20"></label>
       <label class="fld full">Адрес<input name="reqAddr" id="pl-raddr" value="${esc(s.reqAddr || '')}"></label>
       <label class="fld">НДС<select name="reqVat" id="pl-rvat">${[['none', 'Без НДС'], ['5', 'НДС 5%'], ['7', 'НДС 7%'], ['10', 'НДС 10%'], ['22', 'НДС 22%']].map(([v, l]) => `<option value="${v}"${(s.reqVat || 'none') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="fld">Редакция оферты и политики от<input name="legalDate" id="pl-ldate" type="date" value="${esc(s.legalDate || '')}"></label>
+      <p class="hint full">Реквизиты печатаются в счетах, <a href="/offer" target="_blank">договоре-оферте</a> и <a href="/privacy" target="_blank">политике обработки персональных данных</a>. Тексты документов перед запуском проверьте с юристом.</p>
     </fieldset><button class="btn btn-dark">Сохранить</button></form>`;
 }

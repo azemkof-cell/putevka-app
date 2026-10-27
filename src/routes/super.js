@@ -7,7 +7,7 @@ import { parse1C } from '../money.js';
 import { servicesAdmin } from '../views/services.js';
 import { PayError } from '../payments.js';
 
-export default function superRoutes(app, { db, auth, billing, payments, platform, fail, UserError }) {
+export default function superRoutes(app, { db, auth, billing, payments, platform, fail, baseUrl, UserError }) {
   const needSuper = (req, res, next) => {
     if (!req.user) return res.redirect('/login?staff=1');
     if (req.user.role !== 'super') return res.redirect('/p');
@@ -207,7 +207,7 @@ export default function superRoutes(app, { db, auth, billing, payments, platform
     try {
       const p = payments.get(toInt(req.params.id));
       if (!p || !p.invoice_no) return res.redirect('/s/payments');
-      res.type('html').send(await app.locals.invoiceHtml(p, getPark(p.park_id), '/s/payments'));
+      res.type('html').send(await app.locals.invoiceHtml(p, getPark(p.park_id), '/s/payments', baseUrl(req)));
     } catch (e) { next(e); }
   });
 
@@ -274,7 +274,7 @@ export default function superRoutes(app, { db, auth, billing, payments, platform
   app.post('/s/platform', needSuper, (req, res) => {
     const b = req.body, t = (k, n = 200) => String(b[k] || '').trim().slice(0, n);
     platform.set({ payInfo: t('payInfo', 1000), supportPhone: t('supportPhone', 40), supportEmail: t('supportEmail', 120), signupOpen: b.signupOpen === '1' ? '1' : '0',
-      reqName: t('reqName'), reqInn: t('reqInn').replace(/\D/g, ''), reqKpp: t('reqKpp').replace(/\D/g, ''), reqAccount: t('reqAccount').replace(/\D/g, ''),
+      reqName: t('reqName'), reqInn: t('reqInn').replace(/\D/g, ''), reqKpp: t('reqKpp').replace(/\D/g, ''), reqOgrn: t('reqOgrn').replace(/\D/g, '').slice(0, 15), legalDate: parseDate(b.legalDate), reqAccount: t('reqAccount').replace(/\D/g, ''),
       reqBank: t('reqBank'), reqBic: t('reqBic').replace(/\D/g, ''), reqCorr: t('reqCorr').replace(/\D/g, ''), reqAddr: t('reqAddr', 300),
       reqVat: ['none', '5', '7', '10', '22'].includes(b.reqVat) ? b.reqVat : 'none' });
     auth.flash(res, 'Настройки сохранены.');

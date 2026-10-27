@@ -3,3 +3,6 @@ data
 test
 .git
 *.zip
+.env
+Caddyfile
+docker-compose.yml

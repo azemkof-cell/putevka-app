@@ -1,0 +1,10 @@
+# Caddy gets and renews the HTTPS certificate for $DOMAIN by itself (Let's Encrypt / ZeroSSL).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000
+	header Strict-Transport-Security "max-age=31536000"
+}

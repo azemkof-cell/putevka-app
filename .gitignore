@@ -1,3 +1,5 @@
 node_modules/
 data/*.db*
 *.zip
+.env
+data/backups/

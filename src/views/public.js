@@ -102,7 +102,7 @@ export function signupBody({ v = {}, error = '', trialDays = 0 }) {
       ${f('email', 'Эл. почта', 'type="email" required')}
       ${f('login', 'Логин для входа', 'required autocomplete="username" maxlength="60"')}
       <label class="fld">Пароль<input name="password" id="su-password" type="password" minlength="8" required autocomplete="new-password" placeholder="Не короче 8 знаков"></label>
-      <label class="fld check full"><input type="checkbox" name="agree" id="su-agree" value="1" required> Согласен на обработку персональных данных</label>
+      <label class="fld check full"><input type="checkbox" name="agree" id="su-agree" value="1" required><span>Принимаю условия <a href="/offer" target="_blank">договора-оферты</a> и даю согласие на обработку персональных данных по <a href="/privacy" target="_blank">политике</a></span></label>
       <button class="btn btn-main full">Создать кабинет</button>
     </form>
   </section>`;

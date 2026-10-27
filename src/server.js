@@ -3,6 +3,7 @@ process.env.TZ = process.env.TZ || 'Europe/Moscow';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
@@ -54,6 +55,18 @@ export function createApp({
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     });
     next();
+  });
+  // Monitoring: answers without a session and checks that the database responds.
+  const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
+  const started = Date.now();
+  app.get('/health', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      db.prepare('SELECT 1').get();
+      res.json({ ok: true, db: 'ok', version, uptime: Math.round((Date.now() - started) / 1000) });
+    } catch (e) {
+      res.status(503).json({ ok: false, db: 'error', version, error: e.message });
+    }
   });
   app.use(express.static(path.join(__dirname, '..', 'public'), {
     maxAge: '1h',

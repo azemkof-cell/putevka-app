@@ -6,7 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node test/smoke.mjs && node test/yookassa.mjs && node test/epl.mjs",
+    "test": "node test/smoke.mjs && node test/yookassa.mjs && node test/epl.mjs && node test/launch.mjs",
+    "backup": "node scripts/backup.mjs",
     "demo": "node scripts/demo.mjs"
   },
   "engines": {

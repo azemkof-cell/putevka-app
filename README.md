@@ -76,7 +76,7 @@
 npm install
 DB_PATH=data/demo.db npm run demo     # пример: парк, 5 водителей, листы на неделю
 DB_PATH=data/demo.db npm start        # http://localhost:3000
-npm test                              # 34 проверки сценария + 5 проверок ЮKassa на поддельном API
+npm test                              # сценарий, ЮKassa на поддельном API, ЭПЛ, запуск (документы, /health, копии)
 ```
 
 Демо-входы (вкладка «Таксопарк» на странице входа):
@@ -86,36 +86,69 @@ npm test                              # 34 проверки сценария + 5
 
 ## На сервер
 
-Любой VPS с Docker (1 ядро и 1 ГБ хватит на десятки парков).
+Любой VPS с Docker (1 ядро и 1 ГБ хватит на десятки парков). Для данных водителей (152-ФЗ) сервер должен быть в России.
+
+1. Направьте A-запись домена на сервер, откройте порты 80 и 443.
+2. Настройте и запустите:
 
 ```bash
-docker build -t putevka .
-docker run -d --name putevka --restart unless-stopped -p 3000:3000 -v putevka-data:/app/data \
-  -e SUPER_LOGIN=root -e SUPER_PASSWORD='придумайте-пароль' \
-  -e PUBLIC_URL=https://putevka.example.ru -e COOKIE_SECURE=1 -e TRUST_PROXY=1 \
-  putevka
+cp .env.example .env        # DOMAIN, ACME_EMAIL, SUPER_PASSWORD, ключи ЮKassa
+docker compose up -d --build
+docker compose logs -f app  # «Путёвка работает»
 ```
 
-Перед приложением нужен HTTPS (без него не будет установки на телефон и QR-ссылок). Проще всего Caddy:
-`caddy reverse-proxy --from putevka.example.ru --to localhost:3000`.
+`docker-compose.yml` поднимает три контейнера:
+- **app** — приложение, база в томе `data`, проверка здоровья через `/health`;
+- **caddy** — HTTPS для `DOMAIN`: сертификат Let's Encrypt получается и продлевается сам;
+- **backup** — раз в сутки копирует базу в том `backups` и хранит 14 последних копий.
+
+Обновление: `git pull && docker compose up -d --build`. Данные и копии остаются в томах.
 
 | Переменная | Зачем | По умолчанию |
 |---|---|---|
+| `DOMAIN`, `ACME_EMAIL` | домен для HTTPS и почта для Let's Encrypt (только docker compose) | — |
 | `PORT` | порт | `3000` |
 | `DB_PATH` | файл базы SQLite | `data/putevka.db` |
-| `PUBLIC_URL` | адрес сайта для QR-кодов | адрес из запроса |
+| `PUBLIC_URL` | адрес сайта для QR-кодов и ссылок в счетах | `https://$DOMAIN` в compose, иначе адрес из запроса |
 | `SUPER_LOGIN`, `SUPER_PASSWORD`, `SUPER_NAME` | администратор платформы при первом запуске | `root`, случайный пароль в логе |
-| `COOKIE_SECURE` | `1` — вход только по HTTPS | выкл. |
-| `TRUST_PROXY` | `1` — если перед приложением прокси | выкл. |
+| `COOKIE_SECURE` | `1` — вход только по HTTPS | вкл. в compose |
+| `TRUST_PROXY` | `1` — если перед приложением прокси | вкл. в compose |
 | `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | приём карт и СБП через ЮKassa | тестовый режим |
 | `YOOKASSA_RECEIPTS` | `1` — передавать данные для чека 54-ФЗ | выкл. |
 | `PAYMENTS_DEMO` | `0` — выключить тестовую оплату | вкл., пока нет ключей |
+| `BACKUP_DIR`, `BACKUP_KEEP` | куда класть копии и сколько хранить | `data/backups`, `14` |
 
-Резервная копия — один файл базы, копировать раз в сутки:
+### Мониторинг
+
+`GET /health` отвечает без входа: `{"ok":true,"db":"ok","version":"…","uptime":…}` или код 503, если база не отвечает. Подключите его к любому мониторингу (UptimeRobot, Яндекс Мониторинг, Zabbix) с проверкой раз в минуту.
+
+### Резервные копии
+
+Скрипт `scripts/backup.mjs` делает копию работающей базы через `better-sqlite3` `.backup()`, проверяет её (`integrity_check`) и удаляет копии старше 14 последних. Файлы называются `putevka-ГГГГ-ММ-ДД_ЧЧММСС.db`.
+
+- В docker compose это делает контейнер `backup`, ничего настраивать не нужно.
+- Без Docker — через cron, раз в сутки в 03:30:
+  ```
+  30 3 * * * cd /opt/putevka && DB_PATH=data/putevka.db BACKUP_DIR=/var/backups/putevka node scripts/backup.mjs >> /var/log/putevka-backup.log 2>&1
+  ```
+- Копия вручную: `docker compose exec backup node scripts/backup.mjs`.
+- Копии лежат на том же сервере. Раз в неделю уносите их в другое место, например:
+  `docker run --rm -v putevka_backups:/b -v $PWD:/out alpine tar czf /out/putevka-backups.tgz -C /b .`
+
+**Восстановление:**
 
 ```bash
-docker exec putevka node -e "require('better-sqlite3')('/app/data/putevka.db').backup('/app/data/backup-'+new Date().toISOString().slice(0,10)+'.db')"
+docker compose stop app
+docker run --rm -v putevka_data:/data -v putevka_backups:/b alpine sh -c \
+  'rm -f /data/putevka.db-wal /data/putevka.db-shm && cp /b/putevka-2026-10-27_033000.db /data/putevka.db && chown 1000:1000 /data/putevka.db'
+docker compose start app
 ```
+
+Имя тома зависит от папки проекта: проверьте его командой `docker volume ls`.
+
+### Документы для парков
+
+`/offer` (договор-оферта) и `/privacy` (политика обработки персональных данных) собираются из реквизитов в «Платформа» → «Настройки» (наименование, ИНН, КПП, ОГРН, адрес, счёт, почта поддержки, дата редакции) и из текущих тарифов. Ссылки на них стоят в подвале сайта, в форме регистрации и в счёте. Тексты — рабочий шаблон: перед запуском их должен проверить юрист.
 
 ## Электронный путевой лист (ЭПЛ)
 
@@ -161,7 +194,7 @@ docker exec putevka node -e "require('better-sqlite3')('/app/data/putevka.db').b
 
 ## Перед запуском в продажу
 
-- **Политика обработки персональных данных и договор-оферта**: на оферту ссылается счёт, а сама страница пока не сделана. Сервис хранит ФИО, телефоны, ВУ и СНИЛС водителей: нужно уведомление в Роскомнадзор и сервер с базой в РФ (152-ФЗ).
+- **Политика обработки персональных данных и договор-оферта** готовы как шаблон (`/privacy`, `/offer`) — их нужно проверить с юристом. Сервис хранит ФИО, телефоны, ВУ и СНИЛС водителей: нужно уведомление в Роскомнадзор и сервер с базой в РФ (152-ФЗ).
 - **Онлайн-касса** для чеков при оплате картой и СБП (54-ФЗ).
 - **Юридическая сила.** Отметка в сервисе — не электронная подпись. Сейчас «Путёвка» заменяет бумажные бланки и ручное заполнение. Полноценный ЭПЛ — через оператора ЭПД (см. выше).
 - **Состав реквизитов** листа сверьте с приказом Минтранса № 390.
@@ -184,5 +217,9 @@ src/views/            страницы
 public/               стили, скрипт, service worker, манифест, иконки
 test/smoke.mjs        проверка всего сценария
 test/yookassa.mjs     проверка ЮKassa на поддельном API
+test/epl.mjs          ЭПЛ и услуги подписантов
+test/launch.mjs       документы, /health, резервные копии
+scripts/backup.mjs    резервная копия базы
+docker-compose.yml    приложение + Caddy (HTTPS) + ежедневные копии
 scripts/demo.mjs      пример данных
 ```
