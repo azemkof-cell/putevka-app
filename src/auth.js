@@ -22,6 +22,7 @@ export function makeAuth(db, { secureCookies = false } = {}) {
     get: db.prepare('SELECT * FROM sessions WHERE id = ? AND expires_at > ?'),
     del: db.prepare('DELETE FROM sessions WHERE id = ?'),
     delFor: db.prepare('DELETE FROM sessions WHERE kind = ? AND subject_id = ?'),
+    delPush: db.prepare('DELETE FROM push_subs WHERE kind = ? AND subject_id = ?'),
     purge: db.prepare('DELETE FROM sessions WHERE expires_at <= ?'),
     driver: db.prepare('SELECT * FROM drivers WHERE id = ?'),
     user: db.prepare('SELECT * FROM users WHERE id = ? AND active = 1')
@@ -37,7 +38,8 @@ export function makeAuth(db, { secureCookies = false } = {}) {
     if (req.sid) q.del.run(req.sid);
     res.append('Set-Cookie', `${SID}=; ${cookieBase}; Max-Age=0`);
   }
-  const endAllFor = (kind, id) => q.delFor.run(kind, id);
+  // Signed out everywhere (new password, disabled account): their phones stop getting notifications too.
+  const endAllFor = (kind, id) => { q.delFor.run(kind, id); q.delPush.run(kind, id); };
 
   function flash(res, text, tone = 'ok') {
     res.append('Set-Cookie', `${FLASH}=${encodeURIComponent(JSON.stringify({ text, tone }))}; ${cookieBase}; Max-Age=60`);

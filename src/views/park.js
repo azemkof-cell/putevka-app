@@ -20,7 +20,8 @@ export function parkNav(user, counts = {}) {
     ['staff', '/p/staff', 'Сотрудники', '', own],
     ['billing', '/p/billing', 'Баланс', '', own],
     ['settings', '/p/settings', 'Настройки', '', own],
-    ...(counts.epl ? [['me', '/p/me', 'Моя подпись', '', all]] : [])
+    ...(counts.epl ? [['me', '/p/me', 'Моя подпись', '', all]] : []),
+    ['notify', '/p/notify', 'Уведомления', '', all]
   ].filter((i) => i[4].includes(user.role)).map(([k, h, l, b]) => [k, h, l, b]);
 }
 

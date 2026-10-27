@@ -20,6 +20,7 @@ import payRoutes from './routes/pay.js';
 import serviceRoutes from './routes/service.js';
 import { makePayments } from './payments.js';
 import { makeEpd, makeOperator } from './epd.js';
+import { makePush } from './push.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,12 +30,14 @@ export function createApp({
   publicUrl = process.env.PUBLIC_URL || '',
   payments: payOpts = {},
   epd: epdOpts = {},
+  push: pushOpts = {},
   log = console.log
 } = {}) {
   const db = openDb(dbFile);
   const auth = makeAuth(db, { secureCookies });
   const billing = makeBilling(db);
-  const svc = makeService(db, billing);
+  const push = makePush(db, { billing, env: pushOpts.env || process.env, fetchImpl: pushOpts.fetchImpl });
+  const svc = makeService(db, billing, { notify: push.notify });
   const payments = makePayments(db, billing, payOpts);
 
   // First start: create the platform administrator.
@@ -122,7 +125,8 @@ export function createApp({
   // ЭПД operator: EPD_OPERATOR=astral for the real one, the sandbox otherwise. Notifications come to /epd/notify.
   const operator = epdOpts.operator || makeOperator({ env: epdOpts.env || process.env, fetchImpl: epdOpts.fetchImpl, callbackUrl: publicUrl ? `${publicUrl}/epd/notify` : '' });
   const epd = makeEpd(db, svc, { billing, platform, operator });
-  const ctx = { db, auth, billing, payments, epd, svc, platform, rev, back, fail, wrap, list, withQr, baseUrl, UserError,
+  push.epd = epd;
+  const ctx = { db, auth, billing, payments, epd, push, svc, platform, rev, back, fail, wrap, list, withQr, baseUrl, UserError,
     limiter: makeLimiter(), ipLimiter: makeLimiter({ max: 60 }), signupLimiter: makeLimiter({ max: 5, windowMs: 3600e3 }) };
 
   publicRoutes(app, ctx);
@@ -139,13 +143,15 @@ export function createApp({
     res.status(500).type('html').send(C.publicPage({ title: 'Ошибка', bare: true, body: C.errorBody(500, 'Что-то пошло не так. Попробуйте ещё раз.') }));
   });
 
-  return { app, db, svc, billing, payments, epd };
+  return { app, db, svc, billing, payments, epd, push };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { app, epd } = createApp();
+  const { app, epd, push } = createApp();
   const port = Number(process.env.PORT) || 3000;
   // A real operator is also polled in the background: for signers who closed the page and for slow registrations.
+  // Push: scheduled notices (tomorrow's sheet, waiting signatures, subscription) and anything left in the outbox.
+  if (push.enabled) setInterval(() => push.tick().catch((e) => console.error('push:', e)), 60e3).unref();
   if (!epd.operator.sandbox) setInterval(() => epd.syncAll().catch((e) => console.error('epd sync:', e)), 20e3).unref();
   app.listen(port, () => console.log(`Путёвка работает: http://localhost:${port}`));
 }

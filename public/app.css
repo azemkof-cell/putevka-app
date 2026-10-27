@@ -160,6 +160,9 @@ p{margin:0}
 .fld.check a{color:inherit;text-underline-offset:3px}
 .foot-links{display:flex;gap:16px;flex-wrap:wrap}
 .foot-links a{color:var(--muted)}
+.row-between.push-row{flex-wrap:wrap;gap:12px}
+.btn.push-btn{flex:1 1 240px;white-space:normal}
+.notify{max-width:640px;width:100%}
 .legal{max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:22px;overflow-wrap:anywhere}
 .legal h1{font-size:clamp(24px,5vw,32px);line-height:1.2;margin:0 0 6px}
 .legal h2{font-size:18px;margin:0 0 8px}

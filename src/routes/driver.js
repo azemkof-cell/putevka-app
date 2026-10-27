@@ -4,8 +4,10 @@ import { parkSettings } from '../db.js';
 import { sheetStatus, docProblems, IS_ACTIVE, DAYS_AHEAD } from '../service.js';
 import * as C from '../views/common.js';
 import * as D from '../views/driver.js';
+import { notifyPage } from '../views/notify.js';
+import { EVENTS } from '../push.js';
 
-export default function driverRoutes(app, { db, auth, billing, svc, rev, fail, wrap, list, withQr }) {
+export default function driverRoutes(app, { db, auth, billing, svc, push, rev, fail, wrap, list, withQr }) {
   const q = {
     park: db.prepare('SELECT * FROM parks WHERE id = ?'),
     car: db.prepare('SELECT * FROM cars WHERE id = ? AND park_id = ?'),
@@ -86,6 +88,16 @@ export default function driverRoutes(app, { db, auth, billing, svc, rev, fail, w
   app.post('/d/cancel', needDriver, (req, res) => {
     try { svc.cancel(req.driver.park_id, toInt(req.body.id), { by: req.driver.name, reason: 'Отменён водителем', driverId: req.driver.id }); auth.flash(res, 'Лист отменён.'); res.redirect('/d'); }
     catch (e) { fail(req, res, e, '/d'); }
+  });
+
+  app.get('/d/notify', needDriver, (req, res) => page(req, res, { title: 'Уведомления', body: notifyPage({
+    events: EVENTS.driver, off: push.offList(req.driver), devices: push.devices('driver', req.driver.id), enabled: push.enabled, action: '/d/notify' })
+    + '<p class="center"><a class="linkbtn" href="/d">← К моему листу</a></p>' }));
+  app.post('/d/notify', needDriver, (req, res) => {
+    const on = list(req.body.on);
+    db.prepare('UPDATE drivers SET push_off = ? WHERE id = ?').run(Object.keys(EVENTS.driver).filter((k) => !on.includes(k)).join(','), req.driver.id);
+    auth.flash(res, 'Сохранено.');
+    res.redirect('/d/notify');
   });
 
   app.get('/d/sheet/:id', needDriver, wrap(async (req, res) => {

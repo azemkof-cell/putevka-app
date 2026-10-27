@@ -211,6 +211,33 @@ CREATE TABLE IF NOT EXISTS epl_titles (
   operator_id TEXT,
   UNIQUE (sheet_id, code)
 );
+-- Web Push: one row per device; notifications are queued in the same transaction as the change they report.
+CREATE TABLE IF NOT EXISTS push_subs (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('driver','user')),
+  subject_id INTEGER NOT NULL,
+  park_id INTEGER REFERENCES parks(id),
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_subs_subject ON push_subs(kind, subject_id);
+CREATE TABLE IF NOT EXISTS push_outbox (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,
+  subject_id INTEGER NOT NULL,
+  park_id INTEGER,
+  event TEXT NOT NULL,
+  dedup TEXT UNIQUE,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL DEFAULT '/',
+  created_at TEXT NOT NULL,
+  sent_at TEXT,
+  delivered INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS push_outbox_pending ON push_outbox(sent_at);
 CREATE TABLE IF NOT EXISTS sign_sessions (
   id INTEGER PRIMARY KEY,
   park_id INTEGER NOT NULL REFERENCES parks(id),
@@ -244,7 +271,10 @@ const MIGRATIONS = [
   ['users', 'service', 'ALTER TABLE users ADD COLUMN service INTEGER NOT NULL DEFAULT 0'],
   ['users', 'svc_org', "ALTER TABLE users ADD COLUMN svc_org TEXT NOT NULL DEFAULT ''"],
   ['users', 'svc_lic', "ALTER TABLE users ADD COLUMN svc_lic TEXT NOT NULL DEFAULT ''"],
-  ['users', 'svc_city', "ALTER TABLE users ADD COLUMN svc_city TEXT NOT NULL DEFAULT ''"]
+  ['users', 'svc_city', "ALTER TABLE users ADD COLUMN svc_city TEXT NOT NULL DEFAULT ''"],
+  // kinds of push notifications the person switched off, comma-separated
+  ['users', 'push_off', "ALTER TABLE users ADD COLUMN push_off TEXT NOT NULL DEFAULT ''"],
+  ['drivers', 'push_off', "ALTER TABLE drivers ADD COLUMN push_off TEXT NOT NULL DEFAULT ''"]
 ];
 
 /** Older databases have a ledger that does not allow the 'service' kind; rebuild it once. */

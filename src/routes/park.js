@@ -10,6 +10,8 @@ import { sheetDoc } from '../views/driver.js';
 import * as BV from '../views/billing.js';
 import * as EV from '../views/epl.js';
 import { parkServices } from '../views/services.js';
+import { notifyPage } from '../views/notify.js';
+import { staffEvents } from '../push.js';
 import { signRights, parseSignItems } from '../epd.js';
 import { PayError } from '../payments.js';
 import { gostPayload } from '../money.js';
@@ -18,7 +20,7 @@ import { toKop } from '../util.js';
 
 const ORDER = { wait_med: 0, wait_tech: 1, returning: 2, line: 3, planned: 4, refused: 5, closed: 6, expired: 7, cancelled: 8 };
 
-export default function parkRoutes(app, { db, auth, billing, payments, epd, svc, platform, rev, back, fail, wrap, list, withQr, baseUrl, UserError }) {
+export default function parkRoutes(app, { db, auth, billing, payments, epd, push, svc, platform, rev, back, fail, wrap, list, withQr, baseUrl, UserError }) {
   const q = {
     park: db.prepare('SELECT * FROM parks WHERE id = ?'),
     drivers: db.prepare('SELECT * FROM drivers WHERE park_id = ? ORDER BY blocked, name'),
@@ -661,6 +663,16 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, svc,
     catch (e) { fail(req, res, e, '/p/sign'); }
   });
   void signRights;
+
+  /* ================= Уведомления ================= */
+  app.get('/p/notify', needPark(), (req, res) => page(req, res, { title: 'Уведомления', active: 'notify', body: notifyPage({
+    events: staffEvents(req.user), off: push.offList(req.user), devices: push.devices('user', req.user.id), enabled: push.enabled, action: '/p/notify' }) }));
+  app.post('/p/notify', needPark(), (req, res) => {
+    const on = list(req.body.on);
+    db.prepare('UPDATE users SET push_off = ? WHERE id = ? AND park_id = ?').run(Object.keys(staffEvents(req.user)).filter((k) => !on.includes(k)).join(','), req.user.id, req.park.id);
+    auth.flash(res, 'Сохранено.');
+    res.redirect('/p/notify');
+  });
 
   /* ================= Настройки ================= */
   app.get('/p/settings', needPark('owner'), (req, res) => page(req, res, { title: 'Настройки', active: 'settings', body: V.settingsPage({ park: req.park, s: req.pset, operator: epd.operator })

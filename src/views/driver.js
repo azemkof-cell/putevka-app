@@ -90,6 +90,7 @@ export function driverHome({ driver, car, park, tz, today, active, todaySheet, w
     <section><h2 class="h-small">Прошлые листы</h2><div class="hist">
       ${history.length ? history.map((h) => { const st = sheetStatus(h, tz); return `<a href="/d/sheet/${h.id}"><span class="mono">№ ${esc(h.no)}</span>${pill(st)}<small>${ruDay(h.shift_date)}${h.back_at && h.tech_at ? ' · ' + fTime(tz, h.tech_at) + '–' + fTime(tz, h.back_at) : ''}</small><small>${h.odo_back != null && h.odo_out != null ? fNum(h.odo_back - h.odo_out) + ' км' : ''}</small></a>`; }).join('') : '<p class="hint">Пока пусто.</p>'}
     </div></section>
+    <p class="center"><a class="linkbtn" href="/d/notify">Уведомления</a></p>
     ${park.settings?.dispPhone ? `<p class="hint center">Диспетчер: <span class="mono sel">${esc(park.settings.dispPhone)}</span></p>` : ''}
   </div>`;
 }

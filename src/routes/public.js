@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import express from 'express';
 import crypto from 'node:crypto';
 import { normPhone, fPhone } from '../util.js';
 import { dayKey, validTz } from '../time.js';
@@ -13,7 +14,7 @@ export function twaFingerprints(v = process.env.TWA_SHA256) {
   return String(v || '').split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter((x) => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(x));
 }
 
-export default function publicRoutes(app, { db, auth, billing, epd, platform, rev, limiter, ipLimiter, signupLimiter }) {
+export default function publicRoutes(app, { db, auth, billing, epd, push, platform, rev, limiter, ipLimiter, signupLimiter }) {
   const page = (res, opts, code = 200) => res.status(code).type('html').send(C.publicPage(opts));
   const home = (req) => (req.user ? (req.user.role === 'super' ? '/s' : req.user.service ? '/x' : '/p') : req.driver ? '/d' : null);
   const tickets = new Map(); // driver chooses a park when one phone works in several parks
@@ -145,6 +146,27 @@ export default function publicRoutes(app, { db, auth, billing, epd, platform, re
   });
 
   app.get('/offline', (req, res) => res.type('html').send(P.offlineHtml()));
+
+  /* ---------- Web Push: devices of drivers and park staff ---------- */
+  // Whose device: the signed-in driver or park employee; their park is fixed at subscription.
+  const pushWho = (req) => (req.driver ? { kind: 'driver', subjectId: req.driver.id, parkId: req.driver.park_id }
+    : req.user?.park_id ? { kind: 'user', subjectId: req.user.id, parkId: req.user.park_id } : null);
+  app.get('/api/push/key', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!push.enabled) return res.status(404).json({ key: '' });
+    res.json({ key: push.publicKey });
+  });
+  app.post('/api/push/subscribe', express.json({ limit: '8kb' }), (req, res) => {
+    const who = pushWho(req);
+    if (!who) return res.status(401).json({ ok: false });
+    try { push.subscribe({ ...who, sub: req.body }); res.json({ ok: true }); }
+    catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+  });
+  app.post('/api/push/unsubscribe', express.json({ limit: '8kb' }), (req, res) => {
+    const who = pushWho(req);
+    if (!who) return res.status(401).json({ ok: false });
+    res.json({ ok: push.unsubscribe({ ...who, endpoint: req.body?.endpoint }) });
+  });
 
   app.get('/api/rev', (req, res) => {
     res.set('Cache-Control', 'no-store');

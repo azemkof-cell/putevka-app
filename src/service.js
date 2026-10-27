@@ -53,7 +53,7 @@ export function docProblems({ driver, car, day, warnDays = 14 }) {
   return { errors, warnings };
 }
 
-export function makeService(db, billing) {
+export function makeService(db, billing, { notify = () => {} } = {}) {
   const q = {
     park: db.prepare('SELECT * FROM parks WHERE id = ?'),
     driver: db.prepare('SELECT * FROM drivers WHERE id = ? AND park_id = ?'),
@@ -187,6 +187,8 @@ export function makeService(db, billing) {
     db.prepare('UPDATE sheets SET med_status = ?, med_at = ?, med_by = ?, med_entered_by = ?, med_info = ?, med_note = ? WHERE id = ?')
       .run(ok ? 'ok' : 'refused', nowIso(), medic.name, actor.id === medic.id ? null : actor.name,
         JSON.stringify(actor.service ? { org: actor.svc_org, addr: '', lic: actor.svc_lic } : { org: set.medOrg, addr: set.medAddr, lic: set.medLic }), String(note).trim(), s.id);
+    notify({ kind: 'driver', subjectId: s.driver_id, parkId, event: 'med', url: '/d',
+      title: ok ? 'Медосмотр пройден' : 'Медосмотр: не допущен', body: ok ? `Лист № ${s.no}. Дальше — выпуск на линию.` : `Лист № ${s.no}. ${String(note).trim()}` });
     log(parkId, actor.name, ok ? 'Медосмотр: допущен' : 'Медосмотр: не допущен', `№ ${s.no}${actor.id !== medic.id ? `, медработник ${medic.name}` : ''}${note ? ', ' + note : ''}`);
   });
 
@@ -205,6 +207,8 @@ export function makeService(db, billing) {
     }
     db.prepare('UPDATE sheets SET odo_out = ?, tech_status = ?, tech_at = ?, tech_by = ?, tech_note = ? WHERE id = ?')
       .run(odoOut, ok ? 'ok' : 'refused', nowIso(), shortName(actor.name), String(note).trim(), s.id);
+    notify({ kind: 'driver', subjectId: s.driver_id, parkId, event: 'line', url: '/d',
+      title: ok ? 'Вы выпущены на линию' : 'Выпуск запрещён', body: ok ? `Лист № ${s.no}. Хорошей смены!` : `Лист № ${s.no}. ${String(note).trim()}` });
     log(parkId, actor.name, ok ? 'Выпуск на линию' : 'Выпуск запрещён', `№ ${s.no}${note ? ', ' + note : ''}`);
   });
 

@@ -9,6 +9,8 @@
     if (f && !window.confirm(f.dataset.confirm)) { e.preventDefault(); return; }
     if (e.target.closest('form[data-logout]') && navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage('logout'); // forget cached waybills on this phone
+      // stop notifications for this account on this phone; the push service then drops the subscription
+      navigator.serviceWorker.ready.then((r) => r.pushManager?.getSubscription()).then((sub) => sub && sub.unsubscribe()).catch(() => {});
     }
   });
 
@@ -52,6 +54,41 @@
       setTimeout(tick, 3000);
     };
     setTimeout(tick, 3000);
+  }
+
+  // Push notifications on this device: the person switches them on and off here.
+  const pushBtn = document.getElementById('push-toggle');
+  if (pushBtn && 'serviceWorker' in navigator && 'PushManager' in window) {
+    const stateEl = document.getElementById('push-state');
+    const toKey = (s) => { const b = atob((s + '='.repeat((4 - (s.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+    const post = (url, body) => fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const show = (sub) => { pushBtn.hidden = false; pushBtn.textContent = sub ? 'Выключить на этом телефоне' : 'Включить на этом телефоне'; pushBtn.classList.toggle('btn-main', !sub); };
+    navigator.serviceWorker.ready.then(async (reg) => {
+      let sub = await reg.pushManager.getSubscription();
+      show(sub);
+      pushBtn.addEventListener('click', async () => {
+        pushBtn.disabled = true;
+        try {
+          if (sub) {
+            await post('/api/push/unsubscribe', { endpoint: sub.endpoint });
+            await sub.unsubscribe(); sub = null;
+            stateEl.textContent = 'Выключены на этом телефоне.';
+          } else {
+            if (await Notification.requestPermission() !== 'granted') { stateEl.textContent = 'Уведомления запрещены в настройках браузера. Разрешите их для этого сайта.'; return; }
+            const { key } = await (await fetch(pushBtn.dataset.pushKey, { credentials: 'same-origin' })).json();
+            sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toKey(key) });
+            const r = await post('/api/push/subscribe', sub.toJSON());
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) { await sub.unsubscribe(); sub = null; stateEl.textContent = j.error || 'Не получилось включить. Попробуйте ещё раз.'; return; }
+            stateEl.textContent = 'Включены на этом телефоне.';
+          }
+        } catch { stateEl.textContent = 'Не получилось. Проверьте интернет и попробуйте ещё раз.'; }
+        finally { pushBtn.disabled = false; show(sub); }
+      });
+    });
+  } else if (pushBtn) {
+    const h = document.getElementById('push-hint');
+    if (h) h.textContent = 'Этот браузер не умеет показывать уведомления. На iPhone установите приложение на экран «Домой».';
   }
 
   // Offline support and "install to home screen".
