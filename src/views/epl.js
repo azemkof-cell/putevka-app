@@ -50,7 +50,8 @@ export function sessionPage({ s, items, sheets, sandbox, user, base = '/p/sign' 
     <ul class="sign-list">${items.slice(0, 12).map((it) => { const sh = sheets.get(it.sheetId); return `<li><span class="mono">${esc(sh?.no || '')}</span> ${esc(sh ? shortName(snap(sh).driver.name) : '')} · ${names[it.code]}${it.ok === false ? ' · <b class="badmark">отказ</b>' : ''}</li>`; }).join('')}${items.length > 12 ? `<li class="muted">и ещё ${items.length - 12}</li>` : ''}</ul>
     ${sandbox ? `<form method="post" action="${base}/s/${s.id}/confirm"><button class="btn btn-main btn-wide">Подтвердить в тестовом приложении</button></form>
       <p class="hint">Тестовый оператор. В рабочем режиме на телефон подписанта придёт запрос, он подтвердит его сам, и страница обновится автоматически.</p>`
-      : '<p class="hint">Ждём подтверждения… Страница обновится сама.</p>'}
+      : `<p class="hint sign-wait" data-sign-poll="${base}/s/${s.id}/state" data-sign-done="${base}/s/${s.id}">Ждём подтверждения в приложении… Страница обновится сама.</p>
+         <a class="btn btn-wide" href="${base}/s/${s.id}">Я подтвердил — проверить</a>`}
     <form method="post" action="${base}/s/${s.id}/cancel"><button class="linkbtn">Отменить подписание</button></form>
   </section>`;
 }
@@ -67,7 +68,8 @@ export function mySignaturePage({ user, sandbox, action = '/p/me' }) {
         <label class="fld">Вид подписи<select name="sig_type" id="me-sig">${user.role === 'medic' ? '' : `<option value="goskey"${user.sig_type === 'goskey' ? ' selected' : ''}>Госключ + машиночитаемая доверенность</option>`}<option value="ukep"${user.sig_type === 'ukep' || user.role === 'medic' ? ' selected' : ''}>УКЭП (облачная, КриптоПро myDSS)</option></select></label>
         <label class="fld">Сертификат: серийный номер<input name="sig_cert" id="me-cert" value="${esc(user.sig_cert)}" placeholder="из приложения подписи" required></label>
         <p class="hint full">Владелец сертификата: <b>${esc(user.name)}</b>. ФИО в сертификате должно совпадать.</p>
-        <button class="btn btn-dark">${sandbox ? (ready ? 'Сохранить' : 'Подключить тестовую подпись') : 'Сохранить'}</button>
+        <button class="btn btn-dark">${sandbox ? (ready ? 'Сохранить' : 'Подключить тестовую подпись') : 'Проверить у оператора и подключить'}</button>
+        ${sandbox ? '' : '<p class="hint full">Оператор ЭПД проверит, что сертификат существует и выписан на вас.</p>'}
       </form>
       <div class="panel stack"><h2>Что вы подписываете</h2>
         <ul class="rights">

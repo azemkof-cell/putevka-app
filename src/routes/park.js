@@ -601,16 +601,16 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, svc,
     next();
   };
   app.get('/p/me', needPark(), (req, res) => page(req, res, { title: 'Моя подпись', active: 'me', body: EV.mySignaturePage({ user: req.user, sandbox: epd.operator.sandbox }) }));
-  app.post('/p/me', needPark(), (req, res) => {
+  app.post('/p/me', needPark(), wrap(async (req, res) => {
     const type = req.user.role === 'medic' ? 'ukep' : (['ukep', 'goskey'].includes(req.body.sig_type) ? req.body.sig_type : 'goskey');
-    const cert = String(req.body.sig_cert || '').trim().slice(0, 64);
-    if (!cert) { auth.flash(res, 'Укажите серийный номер сертификата из приложения подписи.', 'bad'); return res.redirect('/p/me'); }
-    // In the sandbox the signature is "connected" at once; with a real operator it is confirmed through the operator.
-    db.prepare('UPDATE users SET sig_type = ?, sig_cert = ?, sig_ready = ? WHERE id = ?').run(type, cert, epd.operator.sandbox ? 1 : 0, req.user.id);
-    audit(req, 'Подключил подпись', `${type}, ${cert}`);
-    auth.flash(res, 'Подпись подключена. Подписывать можете только вы.');
-    res.redirect('/p/me');
-  });
+    try {
+      // the operator confirms the certificate exists and is issued to this very person
+      const r = await epd.connectSignature(req.user, { type, cert: req.body.sig_cert });
+      audit(req, 'Подключил подпись', `${r.type}, ${r.cert}`);
+      auth.flash(res, 'Подпись подключена. Подписывать можете только вы.');
+      res.redirect('/p/me');
+    } catch (e) { fail(req, res, e, '/p/me'); }
+  }));
   app.post('/p/staff/:id/tech', needPark('owner'), (req, res) => {
     const u = db.prepare('SELECT * FROM users WHERE id = ? AND park_id = ?').get(toInt(req.params.id), req.park.id);
     if (!u || !['owner', 'dispatcher'].includes(u.role)) { auth.flash(res, 'Аттестацию контролёра указывают диспетчеру или владельцу.', 'bad'); return res.redirect('/p/staff'); }
@@ -624,31 +624,38 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, svc,
   app.get('/p/sign', needPark(), needEpl, (req, res) => {
     page(req, res, { title: 'На подпись', active: 'sign', body: EV.queuePage({ q: epd.queue(req.user, req.park), user: req.user, sandbox: epd.operator.sandbox, operatorName: epd.operator.name }) });
   });
-  app.post('/p/sign', needPark(), needEpl, (req, res) => {
+  app.post('/p/sign', needPark(), needEpl, wrap(async (req, res) => {
     try {
       const items = parseSignItems(req.body);
-      const id = epd.startSession(req.user, req.park, items);
+      const id = await epd.startSession(req.user, req.park, items);
       res.redirect(`/p/sign/s/${id}`);
     } catch (e) { fail(req, res, e, '/p/sign'); }
-  });
-  app.get('/p/sign/s/:id', needPark(), (req, res) => {
+  }));
+  /** The signer confirms in their own app; this page asks the operator and moves on when the batch is signed. */
+  app.get('/p/sign/s/:id', needPark(), wrap(async (req, res) => {
     try {
-      const s = epd.getSession(toInt(req.params.id), req.user);
-      if (s.status !== 'waiting') return res.redirect('/p/sign');
+      const s = await epd.poll(toInt(req.params.id), req.user);
+      if (s.status !== 'waiting') { const m = epd.summary(s); auth.flash(res, m.text, m.tone); return res.redirect('/p/sign'); }
       const items = JSON.parse(s.items);
       const sheets = new Map(items.map((it) => [it.sheetId, q.sheet.get(it.sheetId, req.park.id)]));
       page(req, res, { title: 'Подтверждение подписи', active: 'sign', body: EV.sessionPage({ s, items, sheets, sandbox: epd.operator.sandbox, user: req.user }) });
     } catch (e) { fail(req, res, e, '/p/sign'); }
-  });
-  app.post('/p/sign/s/:id/confirm', needPark(), (req, res) => {
+  }));
+  app.get('/p/sign/s/:id/state', needPark(), wrap(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try { res.json({ status: (await epd.poll(toInt(req.params.id), req.user)).status }); }
+    catch (e) { if (!(e instanceof UserError)) throw e; res.status(404).json({ status: 'unknown' }); }
+  }));
+  app.post('/p/sign/s/:id/confirm', needPark(), wrap(async (req, res) => {
     try {
       if (!epd.operator.sandbox) throw new UserError('Подтверждение приходит от оператора, страница обновится сама.');
       const r = epd.confirm(toInt(req.params.id), req.user);
+      await epd.settle(req.park.id);
       const failed = r.failed.map((f) => `№ ${f.no}: ${f.msg}`).join('; ');
       auth.flash(res, `Подписано: ${r.done.length}.${failed ? ` Не подписано: ${failed}.` : ''}`, r.failed.length ? (r.done.length ? 'warn' : 'bad') : 'ok');
       res.redirect('/p/sign');
     } catch (e) { fail(req, res, e, '/p/sign'); }
-  });
+  }));
   app.post('/p/sign/s/:id/cancel', needPark(), (req, res) => {
     try { epd.cancel(toInt(req.params.id), req.user); auth.flash(res, 'Подписание отменено.'); res.redirect('/p/sign'); }
     catch (e) { fail(req, res, e, '/p/sign'); }
@@ -656,7 +663,7 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, svc,
   void signRights;
 
   /* ================= Настройки ================= */
-  app.get('/p/settings', needPark('owner'), (req, res) => page(req, res, { title: 'Настройки', active: 'settings', body: V.settingsPage({ park: req.park, s: req.pset })
+  app.get('/p/settings', needPark('owner'), (req, res) => page(req, res, { title: 'Настройки', active: 'settings', body: V.settingsPage({ park: req.park, s: req.pset, operator: epd.operator })
     + parkServices({ s: platform.get(), set: req.pset, epl: req.pset.eplMode !== 'off', cities: app.locals.svcCities ? app.locals.svcCities() : [], park: req.park }) }));
   app.post('/p/services', needPark('owner'), (req, res) => {
     if (req.pset.eplMode === 'off') { auth.flash(res, 'Услуги исполнителей работают только с электронными листами.', 'bad'); return res.redirect('/p/settings#services'); }
@@ -673,7 +680,7 @@ export default function parkRoutes(app, { db, auth, billing, payments, epd, svc,
     if (!name) { auth.flash(res, 'Название не может быть пустым.', 'bad'); return res.redirect('/p/settings'); }
     const s = Object.fromEntries(Object.keys(DEFAULT_PARK_SETTINGS).map((k) => [k, String(b[k] ?? '').trim().slice(0, 600)]));
     s.warnDays = String(Math.min(90, Math.max(0, toInt(s.warnDays) ?? 14)));
-    s.eplMode = ['off', 'sandbox'].includes(s.eplMode) ? s.eplMode : 'off';
+    s.eplMode = ['off', 'sandbox', 'on'].includes(s.eplMode) ? s.eplMode : 'off';
     // services are switched on their own form; paper waybills cannot use them
     s.svcMed = s.eplMode === 'off' ? '0' : req.pset.svcMed;
     s.svcMech = s.eplMode === 'off' ? '0' : req.pset.svcMech;

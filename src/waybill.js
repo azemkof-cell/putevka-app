@@ -51,7 +51,7 @@ export function waybill(s, { qr = '', checkUrl = '', titles = null } = {}) {
 
   return `<article class="paper${st === 'cancelled' ? ' is-void' : ''}">
     ${st === 'cancelled' ? '<div class="void">АННУЛИРОВАН</div>' : ''}
-    ${epl ? `<div class="epl-head"><b>Электронный путевой лист</b><span>${s.gis_id ? `Зарегистрирован в ГИС ЭПД · ${esc(s.gis_id)} · ${fDate(tz, s.gis_at)} ${fTime(tz, s.gis_at)}` : 'Ещё не зарегистрирован в ГИС ЭПД: ждёт подписей'}</span></div>` : ''}
+    ${epl ? `<div class="epl-head"><b>Электронный путевой лист</b><span>${s.gis_id ? `Зарегистрирован в ГИС ЭПД · ${esc(s.gis_id)} · ${fDate(tz, s.gis_at)} ${fTime(tz, s.gis_at)}` : s.gis_status === 'rejected' ? `Оператор отказал в регистрации в ГИС ЭПД: ${esc(s.gis_error || 'без причины')}` : s.gis_status === 'pending' ? 'Отправлен на регистрацию в ГИС ЭПД, ждём ответа оператора' : 'Ещё не зарегистрирован в ГИС ЭПД: ждёт подписей'}</span></div>` : ''}
     <div class="p-top">${orgStamp}
       <div class="p-qr">${qr ? `<div class="qr" aria-label="QR-код для проверки листа">${qr}</div>` : ''}<div class="p-legal">Реквизиты по приказу Минтранса России № 390 от 28.09.2022${checkUrl ? `<br>Проверка: <span class="mono">${esc(checkUrl.replace(/^https?:\/\//, ''))}</span>` : ''}</div></div></div>
     <div class="p-title"><div><div class="p-kind">Путевой лист</div><div class="p-dates">с <b>${ruDay(s.shift_date)}</b> по <b>${ruDay(s.valid_to)}</b></div></div>

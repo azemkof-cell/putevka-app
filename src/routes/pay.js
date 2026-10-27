@@ -5,7 +5,16 @@ import { isYooKassaIp, PayError } from '../payments.js';
 import * as C from '../views/common.js';
 import * as BV from '../views/billing.js';
 
-export default function payRoutes(app, { db, auth, payments, wrap, baseUrl }) {
+export default function payRoutes(app, { db, auth, payments, epd, wrap, baseUrl }) {
+  // ЭПД operator notification. Must carry the operator's HMAC signature; even then the body only says
+  // which signing or registration changed, and the state is re-read from the operator's API.
+  app.post('/epd/notify', express.json({ limit: '64kb', verify: (req, res, buf) => { req.rawBody = buf; } }), wrap(async (req, res) => {
+    const op = epd.operator;
+    if (op.sandbox || !op.checkNotification?.(req.rawBody || Buffer.alloc(0), req.get('x-signature'))) return res.status(403).end();
+    await epd.notify(op.parseNotification(req.body));
+    res.status(200).end();
+  }));
+
   // YooKassa notification. The body only says which payment changed; the real status is re-read from the API.
   app.post('/pay/yookassa', express.json({ limit: '64kb' }), wrap(async (req, res) => {
     if (process.env.YOOKASSA_CHECK_IP === '1' && !isYooKassaIp(req.ip)) return res.status(403).end();

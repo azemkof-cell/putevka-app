@@ -52,16 +52,16 @@ db.prepare("UPDATE users SET sig_type = 'ukep', sig_cert = '01DA4C2E00B1', sig_r
 const medic = db.prepare("SELECT * FROM users WHERE login = 'medic'").get();
 const disp = db.prepare("SELECT * FROM users WHERE login = 'disp'").get();
 const p = db.prepare('SELECT * FROM parks WHERE id = ?').get(parkId);
-const sign = (user, items) => epd.confirm(epd.startSession(user, p, items), user);
+const sign = async (user, items) => { epd.confirm(await epd.startSession(user, p, items), user); await epd.settle(p.id); };
 // Ершов: closed shift today; Мамедов's car has an expired diagnostic card; Гусев: on the line; Каримов: waiting for the medical check + a planned week.
 const a = svc.issue(parkId, dIds[1], today, { odo: 64912, by: 'Ершов Денис Андреевич' });
 const b = svc.issue(parkId, dIds[4], today, { odo: 88021, by: disp.name });
 const c = svc.issue(parkId, dIds[0], today, { odo: 128440, by: 'Каримов Руслан Ильдарович' });
-sign(disp, [a, b, c].map((sheetId) => ({ code: 'T1', sheetId })));
-sign(medic, [a, b].map((sheetId) => ({ code: 'T2', sheetId, ok: true })));
-sign(disp, [a, b].map((sheetId) => ({ code: 'T34', sheetId, ok: true, odo: null })));
+await sign(disp, [a, b, c].map((sheetId) => ({ code: 'T1', sheetId })));
+await sign(medic, [a, b].map((sheetId) => ({ code: 'T2', sheetId, ok: true })));
+await sign(disp, [a, b].map((sheetId) => ({ code: 'T34', sheetId, ok: true, odo: null })));
 svc.finish(parkId, a, dIds[1], 65180);
-sign(disp, [{ code: 'T5', sheetId: a, odo: 65180 }]);
+await sign(disp, [{ code: 'T5', sheetId: a, odo: 65180 }]);
 svc.issueDays(parkId, dIds[0], [1, 2, 3, 4].map((n) => addDays(today, n)), 'Каримов Руслан Ильдарович');
 svc.issueDays(parkId, dIds[1], [1, 2].map((n) => addDays(today, n)), disp.name);
 
@@ -79,7 +79,7 @@ const nDrv = [['Соловьёв Глеб Андреевич', '79000000101'], [
 const northOwner = db.prepare("SELECT * FROM users WHERE login = 'north'").get();
 const np = db.prepare('SELECT * FROM parks WHERE id = ?').get(north);
 const ns = nDrv.map((d, i) => svc.issue(north, d, today, { odo: [54120, 23400][i], by: northOwner.name }));
-epd.confirm(epd.startSession(northOwner, np, ns.map((sheetId) => ({ code: 'T1', sheetId }))), northOwner);
+epd.confirm(await epd.startSession(northOwner, np, ns.map((sheetId) => ({ code: 'T1', sheetId }))), northOwner);
 
 console.log(`Демо записано в ${file}.
   Платформа:   root / root-demo-pass

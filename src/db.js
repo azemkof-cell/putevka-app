@@ -231,6 +231,10 @@ const MIGRATIONS = [
   ['sheets', 'epl', 'ALTER TABLE sheets ADD COLUMN epl INTEGER NOT NULL DEFAULT 0'],
   ['sheets', 'gis_id', 'ALTER TABLE sheets ADD COLUMN gis_id TEXT'],
   ['sheets', 'gis_at', 'ALTER TABLE sheets ADD COLUMN gis_at TEXT'],
+  // registration in ГИС ЭПД through the operator: its document id, pending | registered | rejected, and why
+  ['sheets', 'gis_doc', 'ALTER TABLE sheets ADD COLUMN gis_doc TEXT'],
+  ['sheets', 'gis_status', 'ALTER TABLE sheets ADD COLUMN gis_status TEXT'],
+  ['sheets', 'gis_error', 'ALTER TABLE sheets ADD COLUMN gis_error TEXT'],
   ['users', 'sig_type', "ALTER TABLE users ADD COLUMN sig_type TEXT NOT NULL DEFAULT ''"],
   ['users', 'sig_cert', "ALTER TABLE users ADD COLUMN sig_cert TEXT NOT NULL DEFAULT ''"],
   ['users', 'sig_ready', 'ALTER TABLE users ADD COLUMN sig_ready INTEGER NOT NULL DEFAULT 0'],

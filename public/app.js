@@ -40,6 +40,20 @@
     }
   });
 
+  // Signing page: ask the server every 3 s; it checks with the ЭПД operator and the page moves on when done.
+  const signPoll = document.querySelector('[data-sign-poll]');
+  if (signPoll) {
+    const tick = async () => {
+      try {
+        const r = await fetch(signPoll.dataset.signPoll, { cache: 'no-store', credentials: 'same-origin' });
+        const j = await r.json();
+        if (j.status !== 'waiting') { location.href = signPoll.dataset.signDone; return; }
+      } catch { /* offline: try again */ }
+      setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 3000);
+  }
+
   // Offline support and "install to home screen".
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 

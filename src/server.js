@@ -19,7 +19,7 @@ import superRoutes from './routes/super.js';
 import payRoutes from './routes/pay.js';
 import serviceRoutes from './routes/service.js';
 import { makePayments } from './payments.js';
-import { makeEpd } from './epd.js';
+import { makeEpd, makeOperator } from './epd.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +28,7 @@ export function createApp({
   secureCookies = process.env.COOKIE_SECURE === '1',
   publicUrl = process.env.PUBLIC_URL || '',
   payments: payOpts = {},
+  epd: epdOpts = {},
   log = console.log
 } = {}) {
   const db = openDb(dbFile);
@@ -118,7 +119,9 @@ export function createApp({
     return { s, url, qr: await qrSvg(url), titles: s.epl ? epd.titlesOf(s.id) : null };
   }));
 
-  const epd = makeEpd(db, svc, { billing, platform });
+  // ЭПД operator: EPD_OPERATOR=astral for the real one, the sandbox otherwise. Notifications come to /epd/notify.
+  const operator = epdOpts.operator || makeOperator({ env: epdOpts.env || process.env, fetchImpl: epdOpts.fetchImpl, callbackUrl: publicUrl ? `${publicUrl}/epd/notify` : '' });
+  const epd = makeEpd(db, svc, { billing, platform, operator });
   const ctx = { db, auth, billing, payments, epd, svc, platform, rev, back, fail, wrap, list, withQr, baseUrl, UserError,
     limiter: makeLimiter(), ipLimiter: makeLimiter({ max: 60 }), signupLimiter: makeLimiter({ max: 5, windowMs: 3600e3 }) };
 
@@ -140,7 +143,9 @@ export function createApp({
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { app } = createApp();
+  const { app, epd } = createApp();
   const port = Number(process.env.PORT) || 3000;
+  // A real operator is also polled in the background: for signers who closed the page and for slow registrations.
+  if (!epd.operator.sandbox) setInterval(() => epd.syncAll().catch((e) => console.error('epd sync:', e)), 20e3).unref();
   app.listen(port, () => console.log(`Путёвка работает: http://localhost:${port}`));
 }

@@ -75,7 +75,7 @@ export function todayPage({ user, park, tz, today, day, rows, idle, medics, coun
     </div>
     ${rows.length ? `<div class="scroll cards-wrap"><table class="t cards"><thead><tr><th>Лист</th><th>Водитель</th><th>Машина</th><th>Одометр</th><th>Медосмотр</th><th>Выпуск</th><th>Статус</th><th>Действие</th><th></th></tr></thead><tbody>
       ${rows.map((s) => { const sn = snap(s); const st = sheetStatus(s, tz); return `<tr class="st-${st}">
-        <td class="mono" data-l="Лист">${esc(s.no)}${s.epl ? ` <span class="chip ${s.gis_id ? 'c-ok' : 'c-plan'}">ЭПЛ</span>` : ''}${s.shift_date !== day ? `<small>от ${shortRuDay(s.shift_date)}</small>` : ''}</td>
+        <td class="mono" data-l="Лист">${esc(s.no)}${s.epl ? ` <span class="chip ${s.gis_id ? 'c-ok' : s.gis_status === 'rejected' ? 'c-bad' : 'c-plan'}">ЭПЛ</span>` : ''}${s.shift_date !== day ? `<small>от ${shortRuDay(s.shift_date)}</small>` : ''}</td>
         <td class="nm" data-l="Водитель">${esc(shortName(sn.driver.name))}</td>
         <td data-l="Машина">${plate(sn.car)}</td>
         <td class="mono" data-l="Одометр">${s.odo_out != null ? fNum(s.odo_out) : '—'}${s.odo_back != null ? `<small>→ ${fNum(s.odo_back)}</small>` : ''}</td>
@@ -321,7 +321,7 @@ export function staffPage({ users, me }) {
 }
 
 /* ---------------- Настройки ---------------- */
-export function settingsPage({ park, s }) {
+export function settingsPage({ park, s, operator = { sandbox: true, name: 'Тестовый оператор ЭПД' } }) {
   const f = (k, l, extra = '') => `<label class="fld">${l}<input name="${k}" id="s-${k}" value="${esc(s[k])}"${extra}></label>`;
   const p = (k, l, extra = '') => `<label class="fld">${l}<input name="${k}" id="p-${k}" value="${esc(park[k])}"${extra}></label>`;
   return `<div class="head-row"><div><h1>Настройки</h1><p class="muted">Применяются к новым листам. Уже выписанные листы не меняются.</p></div></div>
@@ -334,7 +334,7 @@ export function settingsPage({ park, s }) {
       <fieldset><legend>Путевые листы</legend>
         <label class="fld full">Форма листа<select name="eplMode" id="s-eplMode">
           <option value="off"${s.eplMode === 'off' ? ' selected' : ''}>Бумажный: печать, штампы и подписи ставятся вручную</option>
-          <option value="sandbox"${s.eplMode === 'sandbox' ? ' selected' : ''}>Электронный (ЭПЛ) через тестового оператора ЭПД</option></select></label>
+          <option value="${operator.sandbox ? 'sandbox' : 'on'}"${s.eplMode !== 'off' ? ' selected' : ''}>Электронный (ЭПЛ) через ${operator.sandbox ? 'тестового оператора ЭПД' : `оператора ЭПД «${esc(operator.name)}»`}</option></select></label>
         <p class="hint full">В электронном режиме каждый подписывает свою часть листа своей подписью: задание — диспетчер, медосмотр — медработник (УКЭП), выпуск и приём — аттестованный контролёр. Новый режим действует для новых листов.</p></fieldset>
       <fieldset><legend>Медосмотр</legend>
         ${f('medOrg', 'Медорганизация')}${f('medLic', 'Лицензия')}<div class="full">${f('medAddr', 'Адрес медорганизации')}</div>
