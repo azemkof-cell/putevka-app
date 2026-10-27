@@ -66,7 +66,40 @@
 - iPhone (Safari): «Поделиться» → «На экран Домой». Подсказка показывается сама.
 - Открытые листы сохраняются в телефоне и открываются без интернета. При выходе из аккаунта они стираются.
 
-Если понадобится приложение в RuStore / Google Play / App Store, этот же код заворачивается в оболочку (Capacitor или TWA) без переписывания.
+### Приложение для RuStore (Android)
+
+Android-приложение — это оболочка TWA (Trusted Web Activity) поверх того же сайта: код не дублируется, обновления сайта сразу видны в приложении. Если на телефоне нет Chrome (часто у аудитории RuStore), приложение открывается во встроенном WebView, без адресной строки.
+
+Что уже готово в проекте:
+- `/.well-known/assetlinks.json` — связь приложения с сайтом. Отдаётся, когда задан `TWA_SHA256` (иначе 404);
+- `scripts/twa-config.mjs` — пишет `android/twa-manifest.json` для Bubblewrap из `public/manifest.webmanifest`;
+- иконки: `icon-512.png`, `maskable-512.png` (адаптивная иконка Android), `monochrome-512.png` (тематическая иконка Android 13+), `badge-96.png` (значок уведомлений), `store-512.png` — иконка для карточки RuStore: 512×512, PNG без прозрачности.
+
+**Как собрать APK и загрузить**
+
+1. Сайт уже работает по HTTPS на своём домене (см. «На сервер»).
+2. Поставьте на компьютер Node.js 20+ и Bubblewrap: `npm i -g @bubblewrap/cli`. При первом запуске он сам предложит скачать JDK и Android SDK — соглашайтесь.
+3. Сгенерируйте конфиг:
+   ```bash
+   DOMAIN=putevka.example.ru TWA_VERSION=1.0.0 TWA_VERSION_CODE=1 npm run twa:config
+   cd android
+   ```
+   Имя пакета по умолчанию `ru.putevka.app` (другое — `TWA_PACKAGE=…`). После публикации его менять нельзя.
+4. Создайте Android-проект и ключ подписи:
+   ```bash
+   bubblewrap update --skipVersionUpgrade   # проект из twa-manifest.json
+   keytool -genkeypair -v -keystore android.keystore -alias putevka -keyalg RSA -keysize 2048 -validity 10000
+   ```
+   Если `update` попросит инициализацию, выполните `bubblewrap init --manifest https://putevka.example.ru/manifest.webmanifest` и примите значения из `twa-manifest.json`.
+   **Храните `android.keystore` и пароль вне репозитория и сделайте копию**: без этого ключа обновление в RuStore не выпустить.
+5. Возьмите отпечаток ключа и пропишите его на сервере:
+   ```bash
+   keytool -list -v -keystore android.keystore -alias putevka | grep SHA256
+   ```
+   В `.env`: `TWA_SHA256=AB:CD:…` (несколько ключей — через запятую) и при другом пакете `TWA_PACKAGE=…`, затем `docker compose up -d`. Проверьте: `https://ваш-домен/.well-known/assetlinks.json` отдаёт отпечаток.
+6. Соберите: `bubblewrap build`. Получатся `app-release-signed.apk` и `app-release-bundle.aab`. Проверьте APK на телефоне: `adb install app-release-signed.apk`. Если вверху видна адресная строка, отпечаток в `assetlinks.json` не совпал с ключом.
+7. Загрузите в RuStore: зарегистрируйтесь в консоли разработчика RuStore (console.rustore.ru) как юрлицо или ИП → «Создать приложение» → загрузите `app-release-signed.apk`. Заполните карточку: название «Путёвка», иконка `public/icons/store-512.png`, скриншоты с телефона (лист водителя, медосмотр, выпуск), категория «Бизнес», возрастной рейтинг 0+, ссылка на политику `https://ваш-домен/privacy`, контакты поддержки. Отправьте на модерацию. Точные требования к карточке смотрите в консоли RuStore на момент загрузки.
+8. Обновление приложения нужно, только если менялись иконки, название или пакет: поднимите `TWA_VERSION` и `TWA_VERSION_CODE`, повторите шаги 3, 6 и 7. Изменения сайта приходят в приложение сами.
 
 ## Запуск
 
@@ -117,6 +150,7 @@ docker compose logs -f app  # «Путёвка работает»
 | `YOOKASSA_RECEIPTS` | `1` — передавать данные для чека 54-ФЗ | выкл. |
 | `PAYMENTS_DEMO` | `0` — выключить тестовую оплату | вкл., пока нет ключей |
 | `BACKUP_DIR`, `BACKUP_KEEP` | куда класть копии и сколько хранить | `data/backups`, `14` |
+| `TWA_SHA256`, `TWA_PACKAGE` | отпечатки ключа и пакет Android-приложения для `assetlinks.json` | нет, `ru.putevka.app` |
 
 ### Мониторинг
 
@@ -250,6 +284,7 @@ test/launch.mjs       документы, /health, резервные копии
 src/epd.js            ЭПЛ: титулы, права подписи, интерфейс оператора ЭПД, тестовый оператор
 src/epd/astral.js     адаптер оператора «Калуга Астрал»
 scripts/backup.mjs    резервная копия базы
+scripts/twa-config.mjs  конфиг Bubblewrap для Android-приложения (RuStore)
 docker-compose.yml    приложение + Caddy (HTTPS) + ежедневные копии
 scripts/demo.mjs      пример данных
 ```

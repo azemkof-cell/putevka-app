@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 process.env.SUPER_PASSWORD = 'root-test-pass';
 const { createApp } = await import('../src/server.js');
 const { backupDb } = await import('../scripts/backup.mjs');
+const { twaManifest } = await import('../scripts/twa-config.mjs');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'putevka-launch-'));
 const dbFile = path.join(dir, 't.db');
@@ -116,6 +117,44 @@ try {
     await backupDb({ dbFile, dir: out, now: new Date(Date.UTC(2026, 9, 20)) });
     assert.ok(fs.existsSync(path.join(out, 'чужой-файл.txt')), 'посторонние файлы не трогаются');
     await assert.rejects(backupDb({ dbFile: path.join(dir, 'нет.db'), dir: out }), /База не найдена/);
+  });
+
+  await step('assetlinks.json для приложения RuStore: только с отпечатком из окружения', async () => {
+    delete process.env.TWA_SHA256;
+    assert.equal((await client().get('/.well-known/assetlinks.json')).status, 404);
+    const fp = Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, '0').toUpperCase()).join(':');
+    process.env.TWA_SHA256 = `${fp.toLowerCase()}, не-отпечаток, ${fp.replace(/^00/, 'FF')}`;
+    process.env.TWA_PACKAGE = 'ru.putevka.test';
+    const r = await client().get('/.well-known/assetlinks.json');
+    assert.equal(r.status, 200);
+    assert.match(r.type, /application\/json/);
+    const [link] = JSON.parse(r.text);
+    assert.deepEqual(link.relation, ['delegate_permission/common.handle_all_urls']);
+    assert.equal(link.target.package_name, 'ru.putevka.test');
+    assert.deepEqual(link.target.sha256_cert_fingerprints, [fp, fp.replace(/^00/, 'FF')], 'мусор отброшен, регистр выровнен');
+    delete process.env.TWA_SHA256; delete process.env.TWA_PACKAGE;
+  });
+
+  await step('конфиг Bubblewrap и иконки по требованиям RuStore', async () => {
+    assert.throws(() => twaManifest({ domain: '' }), /DOMAIN/);
+    assert.throws(() => twaManifest({ domain: 'a.ru', packageId: 'Bad-Name' }), /имя пакета/);
+    const m = twaManifest({ domain: 'putevka.example.ru', versionName: '1.2.0', versionCode: 5 });
+    assert.equal(m.host, 'putevka.example.ru');
+    assert.equal(m.packageId, 'ru.putevka.app');
+    assert.equal(m.webManifestUrl, 'https://putevka.example.ru/manifest.webmanifest');
+    assert.equal(m.enableNotifications, true);
+    assert.equal(m.appVersionCode, 5);
+    const png = (f) => { const b = fs.readFileSync(path.join('public', f)); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), type: b[25] }; };
+    for (const u of [m.iconUrl, m.maskableIconUrl, m.monochromeIconUrl]) {
+      const f = new URL(u).pathname;
+      assert.equal((await client().get(f)).status, 200, `${f} отдаётся сайтом`);
+      assert.deepEqual([png(f).w, png(f).h], [512, 512]);
+    }
+    const store = png('/icons/store-512.png');
+    assert.deepEqual([store.w, store.h, store.type], [512, 512, 2], 'иконка для карточки RuStore: 512×512 PNG без прозрачности');
+    const web = JSON.parse((await client().get('/manifest.webmanifest')).text);
+    assert.equal(web.id, '/');
+    assert.ok(web.icons.some((i) => i.purpose === 'monochrome'));
   });
 
   await step('/health отвечает 503, если база недоступна', async () => {

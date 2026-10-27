@@ -3,3 +3,9 @@ data/*.db*
 *.zip
 .env
 data/backups/
+android/*.keystore
+android/app/
+android/build/
+android/*.apk
+android/*.aab
+android/.gradle/

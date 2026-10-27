@@ -8,6 +8,11 @@ import * as C from '../views/common.js';
 import * as P from '../views/public.js';
 import * as L from '../views/legal.js';
 
+/** SHA-256 fingerprints of the app signing keys from TWA_SHA256 (comma-separated, "AA:BB:…" 32 bytes each). */
+export function twaFingerprints(v = process.env.TWA_SHA256) {
+  return String(v || '').split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter((x) => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(x));
+}
+
 export default function publicRoutes(app, { db, auth, billing, epd, platform, rev, limiter, ipLimiter, signupLimiter }) {
   const page = (res, opts, code = 200) => res.status(code).type('html').send(C.publicPage(opts));
   const home = (req) => (req.user ? (req.user.role === 'super' ? '/s' : req.user.service ? '/x' : '/p') : req.driver ? '/d' : null);
@@ -128,6 +133,16 @@ export default function publicRoutes(app, { db, auth, billing, epd, platform, re
   app.get('/privacy', (req, res) => page(res, { title: 'Политика обработки персональных данных', body: L.privacyBody({ s: platform.get() }) }));
   app.get('/offer', (req, res) => page(res, { title: 'Договор-оферта', body: L.offerBody({ s: platform.get(), services: platform.get(),
     tariffs: db.prepare('SELECT * FROM tariffs WHERE personal = 0 ORDER BY is_default DESC, per_sheet DESC').all() }) }));
+
+  /* ---------- Android app (TWA): proves the app and the site belong to the same owner ---------- */
+  app.get('/.well-known/assetlinks.json', (req, res) => {
+    const prints = twaFingerprints();
+    if (!prints.length) return res.status(404).json([]);
+    res.set('Cache-Control', 'public, max-age=3600').json([{
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: { namespace: 'android_app', package_name: process.env.TWA_PACKAGE || 'ru.putevka.app', sha256_cert_fingerprints: prints }
+    }]);
+  });
 
   app.get('/offline', (req, res) => res.type('html').send(P.offlineHtml()));
 

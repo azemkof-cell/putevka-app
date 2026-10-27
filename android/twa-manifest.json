@@ -1,0 +1,37 @@
+{
+  "packageId": "ru.putevka.app",
+  "host": "putevka.example.ru",
+  "name": "Путёвка — путевые листы",
+  "launcherName": "Путёвка",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#181C24",
+  "navigationColor": "#181C24",
+  "navigationColorDark": "#181C24",
+  "navigationDividerColor": "#181C24",
+  "navigationDividerColorDark": "#181C24",
+  "backgroundColor": "#181C24",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://putevka.example.ru/icons/icon-512.png",
+  "maskableIconUrl": "https://putevka.example.ru/icons/maskable-512.png",
+  "monochromeIconUrl": "https://putevka.example.ru/icons/monochrome-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "putevka"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://putevka.example.ru/manifest.webmanifest",
+  "fallbackType": "webview",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": false,
+  "isChromeOSOnly": false,
+  "minSdkVersion": 21
+}
