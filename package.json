@@ -1,0 +1,21 @@
+{
+  "name": "putevka",
+  "version": "2.3.0",
+  "description": "Путевые листы для таксопарков: приложение водителя, кабинет парка, тарифы платформы",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/smoke.mjs && node test/yookassa.mjs && node test/epl.mjs",
+    "demo": "node scripts/demo.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "2.4.3",
+    "better-sqlite3": "11.7.0",
+    "express": "4.21.2",
+    "qrcode": "^1.5.4"
+  }
+}
